@@ -62,7 +62,7 @@ function ModelIcon({ model, className }: { model: ModelConfig; className?: strin
   if (model.icon) {
     return <img src={model.icon} alt={model.name} className={cn("object-contain size-3.5", className)} />;
   }
-  const initial = model.provider ? model.provider.charAt(0).toUpperCase() : model.name.charAt(0).toUpperCase();
+  const initial = model.providerId ? model.providerId.charAt(0).toUpperCase() : model.name.charAt(0).toUpperCase();
   return (
     <span className={cn("flex size-3.5 items-center justify-center rounded-sm bg-primary/10 text-[9px] font-bold text-primary", className)}>
       {initial}
@@ -649,10 +649,6 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       setIsModelSelectOpen(false);
     };
 
-    const cycleEffort = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setEffortIndex((prev) => (prev + 1) % efforts.length);
-    };
 
     const openFileChooser = (e: React.MouseEvent) => {
       e.stopPropagation();
