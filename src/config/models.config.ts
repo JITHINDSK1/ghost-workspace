@@ -1,25 +1,17 @@
 export interface ModelConfig {
   id: string;
   name: string;
-  providerId: 'openrouter' | 'agentrouter';
-  type: 'coding' | 'vision' | 'long-context' | 'fast';
+  providerId: string;
+  type: string;
+  contextLength?: string;
+  vision?: boolean;
+  tools?: boolean;
   icon?: string; 
 }
 
-export const modelsConfig: ModelConfig[] = [
-  { id: 'anthropic/claude-3.5-sonnet:beta', name: 'Claude 3.5 Sonnet', providerId: 'openrouter', type: 'coding' },
-  { id: 'openai/gpt-4o-2024-08-06', name: 'GPT-4o', providerId: 'openrouter', type: 'vision' },
-  { id: 'google/gemini-1.5-pro-exp', name: 'Gemini 1.5 Pro', providerId: 'openrouter', type: 'vision' },
-  { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', providerId: 'openrouter', type: 'fast' },
-  { id: 'google/gemini-1.5-flash', name: 'Gemini 1.5 Flash', providerId: 'openrouter', type: 'fast' },
-  { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus', providerId: 'openrouter', type: 'long-context' },
-  { id: 'meta-llama/llama-3-70b-instruct', name: 'Llama 3 70B', providerId: 'agentrouter', type: 'fast' }
+export const ALLOWLIST = [
+  "Inkling", "Inkling Small", "Qwen3.8 27B", "North Mini Code",
+  "Apodex 1.1 Mini", "Laguna XS 2.1", "Nemotron 3 Nano Omni",
+  "LFM2.5-2.6B", "Gemma 4 26B A4B", "Gemma 4 31B",
+  "Llama 3", "Claude", "Gemini", "Liquid", "Mistral", "Qwen 2.5", "DeepSeek"
 ];
-
-export const getModelsByType = (type: ModelConfig['type']) => {
-  return modelsConfig.filter(m => m.type === type);
-};
-
-export const getModelById = (id: string) => {
-  return modelsConfig.find(m => m.id === id);
-};

@@ -3,8 +3,8 @@
 import * as React from "react";
 import { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { modelsConfig, ModelConfig } from "@/config/models.config";
-import { FileText, File as FileIcon } from "lucide-react";
+import { FileText, File as FileIcon, Search, AlertCircle } from "lucide-react";
+import { ModelConfig } from "@/config/models.config";
 import { toast } from "sonner";
 
 // ----------------------------------------------------------------------
@@ -327,7 +327,6 @@ export interface PromptInputProps {
   onStop?: () => void;
   placeholder?: string;
   className?: string;
-  efforts?: string[];
   defaultValue?: string;
   value?: string;
   onChange?: (value: string) => void;
@@ -342,7 +341,6 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       onStop,
       placeholder = "Ask anything",
       className,
-      efforts = ["Low", "Medium", "Max Effort"],
       defaultValue = "",
       value: controlledValue,
       onChange,
@@ -353,10 +351,22 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     const [expanded, setExpanded] = useState(false);
     const [isSmoothResize, setIsSmoothResize] = useState(false);
     const [localValue, setLocalValue] = useState(defaultValue);
-    const [selectedModel, setSelectedModel] = useState<ModelConfig>(modelsConfig[0]);
-    const [effortIndex, setEffortIndex] = useState(1);
+    const [selectedModel, setSelectedModel] = useState<ModelConfig>({ id: "auto", name: "Auto", providerId: "openrouter", type: "fast", vision: true, tools: true });
+    const [models, setModels] = useState<ModelConfig[]>([selectedModel]);
     const [isModelSelectOpen, setIsModelSelectOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
     const [isDragging, setIsDragging] = useState(false);
+
+    useEffect(() => {
+      fetch("/api/models").then(r => r.json()).then(d => {
+        setModels(d.models);
+        const saved = localStorage.getItem("ghost_selected_model");
+        if (saved) {
+          const found = d.models.find((m:any) => m.id === saved);
+          if (found) setSelectedModel(found);
+        }
+      }).catch(() => {});
+    }, []);
 
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [activeAttachment, setActiveAttachment] = useState<{ attachment: Attachment; rect: DOMRect } | null>(null);
@@ -631,7 +641,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       }
       if (value.trim() === "" && !hasAttachments) return;
       setIsSmoothResize(false);
-      onSubmit?.(value, { model: selectedModel, effort: efforts[effortIndex], attachments: attachments });
+      onSubmit?.(value, { model: selectedModel, effort: "Medium", attachments: attachments });
       handleValueChange("");
       // Removed revokeObjectURL here because we keep them in chat history until unmount
       setAttachments([]);
@@ -710,10 +720,9 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
         const attachment = await processFile(file);
         if (attachment) {
           setAttachments((prev) => [...prev, attachment]);
-          // Auto route to vision model if image
           if (attachment.type === "image") {
-            const visionModel = modelsConfig.find(m => m.type === "vision");
-            if (visionModel) setSelectedModel(visionModel);
+            const visionModel = models.find(m => m.type === "vision" && m.id !== "auto");
+            if (visionModel && !selectedModel.vision) setSelectedModel(visionModel);
           }
         }
       }
@@ -815,8 +824,15 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                   ? "transform 0.15s ease-out, opacity 0.15s ease-out"
                   : "transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease-out",
               }}
-              className="border border-border border-b-0 bg-muted rounded-t-2xl px-2 pt-2 pb-1 flex items-start gap-2 overflow-x-auto prompt-scrollbar"
+              className="border border-border border-b-0 bg-muted rounded-t-2xl px-2 pt-2 pb-1 flex flex-col gap-1 overflow-x-auto prompt-scrollbar"
             >
+              {attachments.some(a => a.type === "image") && !selectedModel.vision && selectedModel.id !== "auto" && (
+                <div className="flex self-start bg-orange-500/10 border border-orange-500/20 text-orange-600 dark:text-orange-400 px-2 py-1 rounded-md text-[10px] items-center gap-1.5 shadow-sm">
+                  <AlertCircle className="size-3" />
+                  <span>Model lacks vision.</span> <button type="button" onClick={() => { setSelectedModel(models[0]); localStorage.setItem("ghost_selected_model", "auto"); }} className="underline font-bold hover:text-orange-500">Use Auto</button>
+                </div>
+              )}
+              <div className="flex items-start gap-2">
               {attachments.map((attachment, index) => (
                 <AttachmentThumb
                   key={attachment.id}
@@ -827,6 +843,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                   registerRef={(id, el) => thumbRefs.current.set(id, el)}
                 />
               ))}
+              </div>
             </div>
           </div>
 
@@ -930,6 +947,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsModelSelectOpen((prev) => !prev);
+                    if (!isModelSelectOpen) setSearchQuery("");
                   }}
                   className={cn(
                     "group flex items-center gap-1 rounded-full px-2 py-1 text-foreground/50 transition-all duration-200 outline-none hover:bg-accent/60 hover:text-foreground cursor-default",
@@ -937,59 +955,62 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                   )}
                   aria-label={`Select model. Current: ${selectedModel.name}`}
                 >
-                  <ModelIcon model={selectedModel} className="opacity-70 group-hover:opacity-100 transition-opacity" />
+                  <ModelIcon model={selectedModel as any} className="opacity-70 group-hover:opacity-100 transition-opacity" />
                   <span className="text-xs font-semibold select-none transition-colors">
                     <MorphingText text={selectedModel.name} />
                   </span>
+                  <Search className="size-3 ml-0.5 opacity-50 group-hover:opacity-100" />
                 </button>
 
                 <div
                   style={{ transformOrigin: "bottom left" }}
-                  onMouseLeave={() => {
-                    setHoverStyle((prev) => ({
-                      ...prev, opacity: 0, transform: prev.transform.replace("scale(1)", "scale(0.95)"), transition: "opacity 0.2s ease-in, transform 0.2s ease-out",
-                    }));
-                  }}
                   className={cn(
-                    "absolute bottom-full left-0 mb-2.5 z-50 w-44 rounded-2xl border border-border bg-card/95 p-1 shadow-xl backdrop-blur-md flex flex-col gap-0.5 transition-all duration-400 cursor-default",
+                    "absolute bottom-full left-0 mb-2.5 z-50 w-64 rounded-2xl border border-border bg-card/95 p-1 shadow-xl backdrop-blur-md flex flex-col gap-1 transition-all duration-400 cursor-default",
                     isModelSelectOpen
                       ? "opacity-100 scale-100 translate-y-0 pointer-events-auto ease-[cubic-bezier(0.34,1.56,0.64,1)]"
                       : "opacity-0 scale-95 translate-y-3 pointer-events-none ease-[cubic-bezier(0.175,0.885,0.32,1.275)]"
                   )}
                 >
-                  <div className="relative flex flex-col gap-0.5">
-                    <div style={hoverStyle} className="absolute left-0 right-0 top-0 h-8 -z-10 rounded-xl bg-accent pointer-events-none" />
-                    {modelsConfig.map((model, idx) => (
+                  <div className="px-2 py-1.5 border-b border-border/50 flex items-center gap-2">
+                    <Search className="size-3.5 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search models..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="bg-transparent border-none outline-none text-xs w-full text-foreground placeholder:text-muted-foreground"
+                      autoFocus={isModelSelectOpen}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto prompt-scrollbar p-1">
+                    {models
+                      .filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .map((model, idx) => (
                       <button
                         key={model.id}
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
-                        onMouseEnter={() => {
-                          setHoverStyle((prev) => ({
-                            opacity: 1, transform: `translateY(${idx * 34}px) scale(1)`,
-                            transition: prev.opacity === 0 ? "opacity 0.15s ease-out" : "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.15s ease", 
-                          }));
-                        }}
-                        onClick={(e) => { e.stopPropagation(); setSelectedModel(model); setIsModelSelectOpen(false); }}
-                        className="group relative flex h-8 w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-xs font-medium text-foreground/80 outline-none active:scale-[0.98] cursor-default"
+                        onClick={(e) => { e.stopPropagation(); setSelectedModel(model); setIsModelSelectOpen(false); localStorage.setItem("ghost_selected_model", model.id); }}
+                        className="group relative flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs font-medium text-foreground/80 outline-none hover:bg-accent active:scale-[0.98] cursor-default transition-all"
                       >
                         <span className="flex items-center gap-2">
-                          <ModelIcon model={model} className="opacity-85 group-hover:opacity-100 transition-opacity" />
-                          {model.name}
+                          <ModelIcon model={model as any} className="opacity-85 group-hover:opacity-100 transition-opacity" />
+                          <span className="truncate max-w-[120px]">{model.name}</span>
                         </span>
+                        <div className="flex items-center gap-1 opacity-70">
+                          {model.contextLength && <span className="text-[9px] bg-foreground/5 px-1 rounded">{model.contextLength}</span>}
+                          {model.vision && <span className="text-[9px] bg-blue-500/10 text-blue-500 px-1 rounded">V</span>}
+                          {model.tools && <span className="text-[9px] bg-orange-500/10 text-orange-500 px-1 rounded">T</span>}
+                        </div>
                       </button>
                     ))}
+                    {models.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">No models found</div>
+                    )}
                   </div>
                 </div>
               </div>
-
-              <button
-                type="button" onMouseDown={(e) => e.preventDefault()} onClick={cycleEffort}
-                className="group flex items-center gap-1 rounded-full px-2 py-1 text-foreground/50 transition-all duration-200 hover:bg-accent/60 hover:text-foreground outline-none cursor-default"
-              >
-                <DynamicBarsIcon level={efforts[effortIndex]} />
-                <span className="text-xs font-semibold select-none transition-colors"><MorphingText text={efforts[effortIndex]} /></span>
-              </button>
 
               <button
                 type="button" onMouseDown={(e) => e.preventDefault()} onClick={openFileChooser} disabled={attachments.length >= maxAttachments}

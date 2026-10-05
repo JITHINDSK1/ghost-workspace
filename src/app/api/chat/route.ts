@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
-import { modelsConfig } from '@/config/models.config';
+import { getAvailableModels } from '@/lib/models';
 import { createChatCompletion } from '@/lib/providers';
 
 export async function POST(req: Request) {
   try {
     const { messages, model } = await req.json();
     
-    const initialModel = modelsConfig.find(m => m.id === model);
+    const models = await getAvailableModels();
+    
+    const initialModel = models.find(m => m.id === model);
     if (!initialModel) return NextResponse.json({ error: "Invalid model" }, { status: 400 });
 
-    const fallbackChain = [initialModel, ...modelsConfig.filter(m => m.type === initialModel.type && m.id !== initialModel.id)];
+    const fallbackChain = [initialModel, ...models.filter(m => m.type === initialModel.type && m.id !== initialModel.id)];
     
     let lastError: Error | null = null;
 
