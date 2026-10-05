@@ -20,6 +20,21 @@ export interface Conversation {
   updatedAt: number;
 }
 
+export interface ArtifactVersion {
+  versionIndex: number;
+  content: string;
+  createdAt: number;
+}
+
+export interface Artifact {
+  id: string;
+  conversationId: string;
+  title: string;
+  type: string;
+  versions: ArtifactVersion[];
+  currentVersionIndex: number;
+}
+
 interface ChatDB extends DBSchema {
   conversations: {
     key: string;
@@ -29,6 +44,11 @@ interface ChatDB extends DBSchema {
   messages: {
     key: string;
     value: Message & { conversationId: string };
+    indexes: { 'by-conversation': string };
+  };
+  artifacts: {
+    key: string;
+    value: Artifact;
     indexes: { 'by-conversation': string };
   };
 }
@@ -46,6 +66,10 @@ export const getDB = async () => {
       if (!db.objectStoreNames.contains('messages')) {
         const msgStore = db.createObjectStore('messages', { keyPath: 'id' });
         msgStore.createIndex('by-conversation', 'conversationId');
+      }
+      if (!db.objectStoreNames.contains('artifacts')) {
+        const artifactStore = db.createObjectStore('artifacts', { keyPath: 'id' });
+        artifactStore.createIndex('by-conversation', 'conversationId');
       }
     },
   });
@@ -72,5 +96,29 @@ export const chatDB = {
       conv.updatedAt = Date.now();
       await db.put('conversations', conv);
     }
+  },
+  async renameConversation(id: string, title: string) {
+    const db = await getDB();
+    const conv = await db.get('conversations', id);
+    if (conv) {
+      conv.title = title;
+      await db.put('conversations', conv);
+    }
+  },
+  async deleteConversation(id: string) {
+    const db = await getDB();
+    await db.delete('conversations', id);
+    const messages = await db.getAllKeysFromIndex('messages', 'by-conversation', id);
+    const tx = db.transaction('messages', 'readwrite');
+    await Promise.all(messages.map(key => tx.store.delete(key)));
+    await tx.done;
+  },
+  async getArtifacts(conversationId: string) {
+    const db = await getDB();
+    return db.getAllFromIndex('artifacts', 'by-conversation', conversationId);
+  },
+  async saveArtifact(artifact: Artifact) {
+    const db = await getDB();
+    await db.put('artifacts', artifact);
   }
 };
