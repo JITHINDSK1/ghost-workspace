@@ -11,6 +11,7 @@ export interface Message {
     data: Blob | string; // Blob or base64
   }[];
   modelUsed?: string;
+  fellBack?: boolean;
   timestamp: number;
 }
 

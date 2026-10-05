@@ -242,7 +242,27 @@ export default function ChatPage() {
         body: JSON.stringify({ messages: apiMessages, model: meta.model.id }),
         signal: abortControllerRef.current.signal,
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errMsg = errorText;
+        try {
+          const parsed = JSON.parse(errorText);
+          errMsg = parsed.error || errorText;
+        } catch(e) {}
+        throw new Error(errMsg);
+      }
       
+      const usedModel = response.headers.get("X-Model-Used") || meta.model.name;
+      const fellBack = response.headers.get("X-Fallback") === 'true';
+
+      setMessages(prev => {
+         const newMsgs = [...prev];
+         newMsgs[newMsgs.length - 1].modelUsed = usedModel;
+         newMsgs[newMsgs.length - 1].fellBack = fellBack;
+         return newMsgs;
+      });
+
       if (!response.body) throw new Error("No response body");
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -320,9 +340,18 @@ export default function ChatPage() {
          }
       }
       
-      await chatDB.addMessage(convId, { id: assistantId, role: "assistant", content: finalContent, timestamp: Date.now(), modelUsed: meta.model.name });
+      await chatDB.addMessage(convId, { id: assistantId, role: "assistant", content: finalContent, timestamp: Date.now(), modelUsed: usedModel, fellBack });
     } catch (err: any) {
-      if (err.name !== "AbortError") console.error("Chat error", err);
+      if (err.name !== "AbortError") {
+         console.error("Chat error", err);
+         setMessages(prev => {
+             const newMsgs = [...prev];
+             if (!newMsgs[newMsgs.length - 1].content) {
+                newMsgs[newMsgs.length - 1].content = `> **Error:** ${err.message}`;
+             }
+             return newMsgs;
+         });
+      }
     } finally {
       setIsStreaming(false);
       abortControllerRef.current = null;
@@ -540,8 +569,9 @@ export default function ChatPage() {
                         {messages.map(m => (
                           <div key={m.id} className={cn("flex flex-col gap-1.5 w-full", m.role === "user" ? "items-end" : "items-start")}>
                              <div className="flex items-center gap-2 px-2">
-                                <span className="text-xs font-semibold opacity-60">
-                                  {m.role === "assistant" ? (m.modelUsed || "Ghost") : "You"}
+                                <span className="text-xs font-semibold opacity-60 flex items-center gap-2">
+                                  {m.role === "assistant" ? `Answered by ${m.modelUsed || "Ghost"}` : "You"}
+                                  {m.fellBack && <span className="text-[10px] text-orange-500 font-medium px-1.5 py-0.5 bg-orange-500/10 rounded-md border border-orange-500/20">(Provider failed, fell back to this model)</span>}
                                 </span>
                              </div>
                              
