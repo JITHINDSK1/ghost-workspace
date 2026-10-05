@@ -11,7 +11,7 @@ import 'highlight.js/styles/github-dark.css';
 import { FileText, Plus, Moon, Sun, PanelLeft, Settings, Search, MessageSquare, MoreHorizontal, Pencil, Trash, Check, X, Code, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { Panel, Group, Separator } from "react-resizable-panels";
 import { CanvasPanel, CanvasArtifact } from "@/components/ui/canvas-panel";
 
 const lightGradient = "radial-gradient(125% 125% at 50% 101%, rgba(245,87,2,1) 10.5%, rgba(245,120,2,1) 16%, rgba(245,140,2,1) 17.5%, rgba(245,170,100,1) 25%, rgba(238,174,202,1) 40%, rgba(202,179,214,1) 65%, rgba(148,201,233,1) 100%)";
@@ -512,7 +512,7 @@ export default function ChatPage() {
           )}
         </AnimatePresence>
 
-        <PanelGroup direction="horizontal" className="flex-1 overflow-hidden h-full z-10">
+        <Group orientation="horizontal" className="flex-1 overflow-hidden h-full z-10">
           <Panel minSize={30} defaultSize={isCanvasOpen && !isMobile ? 50 : 100} className="flex flex-col relative h-full">
              <header className="md:hidden flex items-center justify-between p-3 sticky top-0 z-30">
                 <button onClick={() => setIsMobileOpen(true)} className="p-2 rounded-lg bg-white/50 dark:bg-black/50 backdrop-blur-xl border border-white/40 dark:border-white/10 text-gray-900 dark:text-gray-100 shadow-sm">
@@ -586,13 +586,13 @@ export default function ChatPage() {
 
           {isCanvasOpen && !isMobile && (
             <>
-              <PanelResizeHandle className="w-1.5 bg-border/20 hover:bg-blue-500/50 active:bg-blue-500 transition-colors cursor-col-resize z-50" />
+              <Separator className="w-1.5 bg-border/20 hover:bg-blue-500/50 active:bg-blue-500 transition-colors cursor-col-resize z-50" />
               <Panel minSize={30} defaultSize={50} className="h-full z-40 bg-white/50 dark:bg-black/50 backdrop-blur-2xl">
                  <CanvasPanel artifact={currentArtifact} onClose={() => setIsCanvasOpen(false)} onUpdate={(code) => setCurrentArtifact(prev => prev ? {...prev, code} : null)} />
               </Panel>
             </>
           )}
-        </PanelGroup>
+        </Group>
 
         {/* Mobile Canvas Fullscreen Overlay */}
         <AnimatePresence>
