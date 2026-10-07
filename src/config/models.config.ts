@@ -4,9 +4,13 @@ export interface ModelConfig {
   providerId: string;
   type: string;
   contextLength?: string;
+  contextTokens?: number;
+  maxCompletionTokens?: number;
   vision?: boolean;
   tools?: boolean;
+  tier?: 'build' | 'patch' | 'chat-only';
   icon?: string; 
+  supportedParameters?: string[];
 }
 
 export const ALLOWLIST = [

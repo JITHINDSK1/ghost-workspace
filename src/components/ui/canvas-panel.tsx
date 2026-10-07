@@ -84,6 +84,12 @@ export function CanvasPanel({
                 srcDoc={code}
                 sandbox="allow-scripts allow-forms allow-modals allow-popups"
                 className="w-full h-full border-0 bg-white"
+                onLoad={() => {
+                  if (!(window as any).__loggedIframe) {
+                    console.log("IFRAME SRCDOC (first 200 chars):", code.substring(0, 200));
+                    (window as any).__loggedIframe = true;
+                  }
+                }}
               />
            </div>
         </div>

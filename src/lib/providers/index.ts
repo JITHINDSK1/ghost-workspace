@@ -38,16 +38,28 @@ export const providers: ProviderConfig[] = [
 
 export const getProvider = (providerId: string) => providers.find(p => p.id === providerId);
 
-export async function createChatCompletion(providerId: string, payload: any, signal?: AbortSignal) {
+export async function createChatCompletion(providerId: string, payload: any, signal?: AbortSignal, options?: { customApiKey?: string, customBaseUrl?: string }) {
   const provider = getProvider(providerId);
   if (!provider) throw new Error(`Provider ${providerId} not found`);
-  if (!provider.apiKey) throw new Error(`API key for ${providerId} not configured. Please add ${providerId.toUpperCase()}_API_KEY to your .env file.`);
+  
+  const apiKey = options?.customApiKey?.trim() || provider.apiKey;
+  const baseURL = options?.customBaseUrl?.trim() || provider.baseURL;
+
+  if (!apiKey) throw new Error(`API key for ${providerId} not configured. Please add a key in Settings.`);
+
+  // Validation
+  if (apiKey.includes(' ') || apiKey.includes('\n')) {
+     throw new Error(`Invalid API key format for ${providerId}.`);
+  }
+  if (!baseURL.startsWith('https://')) {
+     throw new Error(`Base URL for ${providerId} must use HTTPS.`);
+  }
 
   const cleanPayload = stripNullUndefined(payload);
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${provider.apiKey}`,
+    'Authorization': `Bearer ${apiKey}`,
     ...(provider.headers || {})
   };
 
@@ -58,7 +70,7 @@ export async function createChatCompletion(providerId: string, payload: any, sig
   if (signal) signal.addEventListener('abort', abortHandler);
 
   try {
-    const response = await fetch(`${provider.baseURL}/chat/completions`, {
+    const response = await fetch(`${baseURL}/chat/completions`, {
       method: 'POST',
       headers,
       body: JSON.stringify(cleanPayload),

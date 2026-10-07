@@ -33,7 +33,26 @@ export async function getAvailableModels(): Promise<ModelConfig[]> {
         let contextLength = m.context_length ? `${Math.round(m.context_length / 1000)}K` : "Unknown";
         if (m.context_length >= 1000000) contextLength = `${Math.round(m.context_length / 1000000)}M`;
         
-        return { id: m.id, name: m.name, providerId: "openrouter", type: vision ? "vision" : "fast", contextLength, vision, tools };
+        const contextTokens = m.context_length || 8192;
+        const maxCompletionTokens = m.top_provider?.max_completion_tokens || m.max_completion_tokens || (contextTokens >= 32000 ? 16384 : 8192);
+        
+        let paramCount = 0;
+        const paramMatch = m.name.match(/(\d+(?:\.\d+)?)B/i);
+        if (paramMatch) paramCount = parseFloat(paramMatch[1]);
+        
+        let tier: 'build' | 'patch' | 'chat-only' = 'chat-only';
+        if (contextTokens >= 100000 && paramCount >= 7) {
+          tier = 'build';
+        } else if (contextTokens >= 32000 || paramCount >= 3) {
+          tier = 'patch';
+        }
+        
+        const supportedParameters = m.top_provider?.supported_parameters || m.supported_parameters || [];
+        
+        return { 
+          id: m.id, name: m.name, providerId: "openrouter", type: vision ? "vision" : "fast", 
+          contextLength, contextTokens, maxCompletionTokens, vision, tools, tier, supportedParameters 
+        };
       });
       
     if (mapped.length < 3) {
@@ -41,7 +60,18 @@ export async function getAvailableModels(): Promise<ModelConfig[]> {
         const vision = m.architecture?.modality?.includes("image") || m.id.includes("vision") || m.id.includes("gemini");
         let contextLength = m.context_length ? `${Math.round(m.context_length / 1000)}K` : "Unknown";
         if (m.context_length >= 1000000) contextLength = `${Math.round(m.context_length / 1000000)}M`;
-        return { id: m.id, name: m.name, providerId: "openrouter", type: vision ? "vision" : "fast", contextLength, vision, tools: true };
+        const contextTokens = m.context_length || 8192;
+        const maxCompletionTokens = m.top_provider?.max_completion_tokens || (contextTokens >= 32000 ? 16384 : 8192);
+        
+        let paramCount = 0;
+        const paramMatch = m.name.match(/(\d+(?:\.\d+)?)B/i);
+        if (paramMatch) paramCount = parseFloat(paramMatch[1]);
+        let tier: 'build' | 'patch' | 'chat-only' = (contextTokens >= 100000 && paramCount >= 7) ? 'build' : (contextTokens >= 32000 || paramCount >= 3) ? 'patch' : 'chat-only';
+        
+        return { 
+          id: m.id, name: m.name, providerId: "openrouter", type: vision ? "vision" : "fast", 
+          contextLength, contextTokens, maxCompletionTokens, vision, tools: true, tier, supportedParameters: [] 
+        };
       });
     }
 
